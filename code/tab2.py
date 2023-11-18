@@ -76,16 +76,10 @@ def show_tab2():
     t_interval      = settings[27]
 
     if max_counts <= 0:
-        max_counts = 1000000
-        #counts_warning = 'red'
-    else: 
-        counts_warning = 'white'    
+        max_counts = 1000000   
 
     if max_seconds <= 0:
         max_seconds = 3600
-        #seconds_warning = 'red'
-    else: 
-        seconds_warning = 'white' 
         
     if t_interval <= 0:
         t_interval = 10    
@@ -103,16 +97,16 @@ def show_tab2():
         html.Div(id='t2_setting_div1', children=[
             html.Button('START', id='start'),
             html.Div(id='start_text', children=''),
-            html.Div(id='counts', children= ''),
+            html.Div(id='counts', children= '', style={'font-size': '24px'}),
             html.Div(''),
-            html.Div(['Max Counts', dcc.Input(id='max_counts', type='number', step=1000,  readOnly=False, value=max_counts, style={'background-color': counts_warning} )]),
+            html.Div(['Max Counts', dcc.Input(id='max_counts', type='number', step=1000,  readOnly=False, value=max_counts)]),
             ]),
 
         html.Div(id='t2_setting_div2', children=[            
             html.Button('STOP', id='stop'), 
             html.Div(id='stop_text', children=''),
-            html.Div(id='elapsed', children= '' ),
-            html.Div(['Max Seconds', dcc.Input(id='max_seconds', type='number', step=60,  readOnly=False, value=max_seconds, style={'background-color': seconds_warning} )]),
+            html.Div(id='elapsed', children= '', style={'font-size': '24px'}),
+            html.Div(['Max Seconds', dcc.Input(id='max_seconds', type='number', step=60,  readOnly=False, value=max_seconds)]),
             html.Div(id='cps', children=''),
             ]),
 
