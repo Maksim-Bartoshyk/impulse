@@ -16,15 +16,7 @@ from server import app
 # ----------- Audio input selection ---------------------------------
 
 def show_tab1():
-    
-    database = fn.get_file_path('.data.db')
-    print(f'DEADBEEF: {database}')
-
-    conn = sql.connect(database)
-    c = conn.cursor()
-    query = "SELECT * FROM settings "
-    c.execute(query) 
-    settings = c.fetchall()[0]
+    settings = fn.load_settings()
 
     name            = settings[1]
     device          = settings[2]             

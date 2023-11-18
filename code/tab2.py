@@ -21,8 +21,6 @@ n_clicks = None
 global_counts = 0
 global_cps = 0
 
-data_directory  = os.path.join(os.path.expanduser("~"), "impulse_data")
-
 def show_tab2():
 
     global global_counts
@@ -30,8 +28,8 @@ def show_tab2():
     global cps_list
 
     # Get all filenames in data folder and its subfolders
-    files = [os.path.relpath(file, data_directory).replace("\\", "/")
-             for file in glob.glob(os.path.join(data_directory, "**", "*.json"), recursive=True)]
+    files = [os.path.relpath(file, fn.get_data_dir()).replace("\\", "/")
+             for file in glob.glob(os.path.join(fn.get_data_dir(), "**", "*.json"), recursive=True)]
     # Add "i/" prefix to subfolder filenames for label and keep the original filename for value
     options = [{'label': "~ " + os.path.basename(file), 'value': file} if "i/" in file and file.endswith(".json") 
                 else {'label': os.path.basename(file), 'value': file} for file in files]
@@ -46,15 +44,9 @@ def show_tab2():
         file['label'] = file['label'].replace('.json', '')
         file['value'] = file['value'].replace('.json', '')
 
-    database = fn.get_path(f'{data_directory}/.data.db')
-    conn            = sql.connect(database)
-    c               = conn.cursor()
-    query           = "SELECT * FROM settings "
-    c.execute(query) 
+    settings        = fn.load_settings()
 
-    settings        = c.fetchall()[0]
-
-    filename        = settings[1]
+    spectrum_name   = settings[1]
     device          = settings[2]             
     sample_rate     = settings[3]
     chunk_size      = settings[4]
@@ -77,28 +69,33 @@ def show_tab2():
     coeff_1         = settings[18]
     coeff_2         = settings[19]
     coeff_3         = settings[20]
-    filename2       = settings[21]
+    comparison_name = settings[21]
     peakfinder      = settings[23]
     sigma           = settings[25]
     max_seconds     = settings[26]
     t_interval      = settings[27]
 
-    if max_counts == 0:
-        counts_warning = 'red'
+    if max_counts <= 0:
+        max_counts = 1000000
+        #counts_warning = 'red'
     else: 
         counts_warning = 'white'    
 
-    if max_seconds == 0:
-        seconds_warning = 'red'
+    if max_seconds <= 0:
+        max_seconds = 3600
+        #seconds_warning = 'red'
     else: 
         seconds_warning = 'white' 
+        
+    if t_interval <= 0:
+        t_interval = 10    
 
     html_tab2 = html.Div(id='tab2', children=[
         html.Div(id='polynomial', children=''),
         html.Div(id='bar_chart_div', # Histogram Chart
             children=[
                 dcc.Graph(id='bar-chart', figure={},),
-                dcc.Interval(id='interval-component', interval=1000, n_intervals=0) # Refresh rate 1s.
+                dcc.Interval(id='interval-component', interval=t_interval*1000, n_intervals=0)
             ]),
 
         html.Div(id='t2_filler_div', children=''),
@@ -120,7 +117,7 @@ def show_tab2():
             ]),
 
         html.Div(id='t2_setting_div3', children=[
-            html.Div(['File name:', dcc.Input(id='filename' ,type='text' ,value=filename )]),
+            html.Div(['File name:', dcc.Input(id='spectrum_name' ,type='text' ,value=spectrum_name )]),
             html.Div(['Number of bins:', dcc.Input(id='bins'        ,type='number'  ,value=bins )]),
             html.Div(['bin size      :', dcc.Input(id='bin_size'    ,type='number'  ,value=bin_size )]),
             ]), 
@@ -135,10 +132,10 @@ def show_tab2():
         html.Div(id='t2_setting_div5', children=[
             html.Div('Select Comparison'),
             html.Div(dcc.Dropdown(
-                    id='filename2',
+                    id='comparison_name',
                     options=options_sorted,
                     placeholder='Select acomparison',
-                    value=filename2,
+                    value=comparison_name,
                     style={'font-family':'Arial', 'height':'32px', 'margin':'0px', 'padding':'0px','border':'None', 'text-align':'left'}
                     )),
 
@@ -219,11 +216,11 @@ def update_output(n_clicks):
                 Output('elapsed'            ,'children'),
                 Output('cps'                ,'children')],
                [Input('interval-component'  ,'n_intervals'), 
-                Input('filename'            ,'value'), 
+                Input('spectrum_name'       ,'value'), 
                 Input('epb_switch'          ,'on'),
                 Input('log_switch'          ,'on'),
                 Input('cal_switch'          ,'on'),
-                Input('filename2'           ,'value'),
+                Input('comparison_name'     ,'value'),
                 Input('compare_switch'      ,'on'),
                 Input('difference_switch'   ,'on'),
                 Input('peakfinder'          ,'value'),
@@ -231,14 +228,14 @@ def update_output(n_clicks):
                 Input('tabs'                ,'value')
                 ])
 
-def update_graph(n, filename, epb_switch, log_switch, cal_switch, filename2, compare_switch, difference_switch, peakfinder, sigma, active_tab):
+def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, comparison_name, compare_switch, difference_switch, peakfinder, sigma, active_tab):
 
     if active_tab != 'tab2':  # only update the chart when "tab2" is active
         raise PreventUpdate
 
     global global_counts
-    histogram1 = fn.get_path(f'{data_directory}/{filename}.json')
-    histogram2 = fn.get_path(f'{data_directory}/{filename2}.json')
+    histogram1 = fn.get_file_path(f'{spectrum_name}.json')
+    histogram2 = fn.get_file_path(f'{comparison_name}.json')
 
     if os.path.exists(histogram1):
         with open(histogram1, "r") as f:
@@ -346,7 +343,7 @@ def update_graph(n, filename, epb_switch, log_switch, cal_switch, filename2, com
                     )
                 )
 
-            title_text = "<b>{}</b><br><span style='font-size: 12px'>{}</span>".format(filename, time)
+            title_text = "<b>{}</b><br><span style='font-size: 12px'>{}</span>".format(spectrum_name, time)
 
             layout = go.Layout(
                 paper_bgcolor = 'white', 
@@ -445,7 +442,7 @@ def update_graph(n, filename, epb_switch, log_switch, cal_switch, filename2, com
                 paper_bgcolor = 'white', 
                 plot_bgcolor = 'white',
                 title={
-                'text': filename,
+                'text': spectrum_name,
                 'x': 0.9,
                 'y': 0.9,
                 'xanchor': 'center',
@@ -466,8 +463,8 @@ def update_graph(n, filename, epb_switch, log_switch, cal_switch, filename2, com
                 Input('bin_size'        ,'value'),
                 Input('max_counts'      ,'value'),
                 Input('max_seconds'     ,'value'),
-                Input('filename'        ,'value'),
-                Input('filename2'       ,'value'),
+                Input('spectrum_name'   ,'value'),
+                Input('comparison_name' ,'value'),
                 Input('threshold'       ,'value'),
                 Input('tolerance'       ,'value'),
                 Input('calib_bin_1'     ,'value'),
@@ -481,9 +478,9 @@ def update_graph(n, filename, epb_switch, log_switch, cal_switch, filename2, com
                 Input('t_interval'      ,'value')
                 ])  
 
-def save_settings(bins, bin_size, max_counts, max_seconds, filename, filename2, threshold, tolerance, calib_bin_1, calib_bin_2, calib_bin_3, calib_e_1, calib_e_2, calib_e_3, peakfinder, sigma, t_interval):
-    
-    database = fn.get_path(f'{data_directory}/.data.db')
+def save_settings(bins, bin_size, max_counts, max_seconds, spectrum_name, comparison_name, threshold, tolerance, calib_bin_1, calib_bin_2, calib_bin_3, calib_e_1, calib_e_2, calib_e_3, peakfinder, sigma, t_interval):
+    # TODO: move all references to database file to functions
+    database = fn.get_file_path('.data.db')
 
     conn = sql.connect(database)
     c = conn.cursor()
@@ -492,8 +489,8 @@ def save_settings(bins, bin_size, max_counts, max_seconds, filename, filename2, 
                     bins={bins}, 
                     bin_size={bin_size}, 
                     max_counts={max_counts}, 
-                    name='{filename}', 
-                    comparison='{filename2}',
+                    name='{spectrum_name}', 
+                    comparison='{comparison_name}',
                     threshold={threshold}, 
                     tolerance={tolerance}, 
                     calib_bin_1={calib_bin_1},
@@ -534,18 +531,18 @@ def save_settings(bins, bin_size, max_counts, max_seconds, filename, filename2, 
 
 #-------PLAY SOUND ---------------------------------------------
 
-@app.callback( Output('audio'       ,'children'),
-                [Input('soundbyte'  ,'n_clicks'),
-                Input('filename2'   ,'value')])    
+@app.callback(Output('audio'            ,'children'),
+             [Input('soundbyte'         ,'n_clicks'),
+              Input('comparison_name'   ,'value')])    
 
 
-def play_sound(n_clicks, filename2):
+def play_sound(n_clicks, comparison_name):
 
     if n_clicks is None:
         raise PreventUpdate
     else:
         spectrum_2 = []
-        histogram2 = fn.get_path(f'{data_directory}/{filename2}.json')
+        histogram2 = fn.get_file_path(f'{comparison_name}.json')
 
         if os.path.exists(histogram2):
                 with open(histogram2, "r") as f:
@@ -554,9 +551,9 @@ def play_sound(n_clicks, filename2):
 
         gc = fn.gaussian_correl(spectrum_2, 1)
 
-        asp.make_wav_file(filename2, gc)
+        asp.make_wav_file(comparison_name, gc)
 
-        asp.play_wav_file(filename2)
+        asp.play_wav_file(comparison_name)
     return
 
 #------UPDATE CALIBRATION OF EXISTING SPECTRUM-------------------
@@ -564,10 +561,10 @@ def play_sound(n_clicks, filename2):
 @app.callback(
     Output('update_calib_message','children'),
     [Input('update_calib_button' ,'n_clicks'),
-    Input('filename'         ,'value')
+    Input('spectrum_name'        ,'value')
     ])
 
-def update_current_calibration(n_clicks, filename):
+def update_current_calibration(n_clicks, spectrum_name):
     if n_clicks is None:
         raise PreventUpdate
     else:
@@ -577,6 +574,6 @@ def update_current_calibration(n_clicks, filename):
         coeff_3         = round(settings[20],6)
 
         # Update the calibration coefficients using the specified values
-        fn.update_coeff(filename, coeff_1, coeff_2, coeff_3)
+        fn.update_coeff(spectrum_name, coeff_1, coeff_2, coeff_3)
         # Return a message indicating that the update was successful
         return f"Update {n_clicks}"
