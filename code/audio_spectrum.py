@@ -4,9 +4,7 @@ import scipy.io.wavfile as wavfile
 import pyaudio
 import wave
 
-data_directory = os.path.join(os.path.expanduser("~"), "impulse_data")
-
-def make_wav_file(filename, numbers):
+def make_wav_file(name, numbers):
     # Normalize the list of numbers to be between 0 and 1
     volume_array = np.array(numbers) / max(numbers)
 
@@ -31,13 +29,13 @@ def make_wav_file(filename, numbers):
     scaled_signal = np.int16(combined_signal / np.max(np.abs(combined_signal)) * 32767)
 
     # Save the audio file
-    wavfile.write(f'{data_directory}/{filename}.wav', sampling_rate, scaled_signal)
+    wavfile.write(fn.get_file_path(f'{name}.wav'), sampling_rate, scaled_signal)
 
     return
 
 
-def play_wav_file(filename):
-    filename = f'{data_directory}/{filename}.wav'
+def play_wav_file(name):
+    filename = fn.get_file_path(f'{name}.wav')
 
     # Open the WAV file
     wf = wave.open(filename, 'rb')
