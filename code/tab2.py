@@ -111,7 +111,7 @@ def show_tab2():
             ]),
 
         html.Div(id='t2_setting_div3', children=[
-            html.Div(['File name:', dcc.Input(id='spectrum_name' ,type='text' ,value=spectrum_name )]),
+            html.Div(['Spectrum name:', dcc.Input(id='spectrum_name' ,type='text' ,value=spectrum_name )]),
             html.Div(['Number of bins:', dcc.Input(id='bins'        ,type='number'  ,value=bins )]),
             html.Div(['bin size      :', dcc.Input(id='bin_size'    ,type='number'  ,value=bin_size )]),
             ]), 
@@ -258,8 +258,7 @@ def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, compariso
             if elapsed == 0:
                 cps = 0  
             else:
-                cps = validPulseCount - global_counts
-                global_counts = validPulseCount  
+                cps = validPulseCount / elapsed  
      
             x = list(range(numberOfChannels))
             y = spectrum
