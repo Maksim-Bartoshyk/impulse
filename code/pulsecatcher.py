@@ -1,6 +1,7 @@
 # This page is the main pulse catcher file, it 
 # collects, normalises and filters the pulses 
 # ultimately saving the histogram file to JSON.
+import os
 import pyaudio
 import wave
 import math
@@ -10,6 +11,7 @@ import sqlite3 as sql
 import datetime
 from collections import defaultdict
 import csv
+import json
 
 data 			= None
 left_channel 	= None
@@ -21,7 +23,7 @@ global_cps      = 0
 global_counts	= 0
 
 # Function reads audio stream and finds pulses then outputs time, pulse height and distortion
-def pulsecatcher(mode):
+def pulsecatcher(mode, continue_spectrum):
 
 	# Start timer
 	t0				= datetime.datetime.now()
@@ -30,7 +32,7 @@ def pulsecatcher(mode):
 
 	# Get the following from settings
 	settings 		= fn.load_settings()
-	filename        = settings[1]
+	spectrum_name   = settings[1]
 	device          = settings[2]             
 	sample_rate     = settings[3]
 	chunk_size      = settings[4]                        
@@ -77,7 +79,20 @@ def pulsecatcher(mode):
 
 	global_counts = 0
 
-	elapsed = 0
+	already_elapsed = 0
+	
+	# Continue spectrum if exists
+	# TODO: add spectrum configuration compatibility check
+	jsonfile = fn.get_file_path(f'{spectrum_name}.json')
+	if continue_spectrum and os.path.exists(jsonfile):
+		with open(jsonfile, "r") as f:
+			data = json.load(f)
+			global_counts       = data["resultData"]["energySpectrum"]["validPulseCount"]
+			already_elapsed     = data["resultData"]["energySpectrum"]["measurementTime"]
+			histogram           = data["resultData"]["energySpectrum"]["spectrum"]
+			# TODO: update t0 (start time)?
+	
+	elapsed = already_elapsed
 
 	# Open the selected audio input device
 	stream = p.open(
@@ -124,12 +139,12 @@ def pulsecatcher(mode):
 
 		t1 = datetime.datetime.now() # Time capture
 		te = time.time()
-		elapsed = te - tb
+		elapsed = te - tb + already_elapsed
 
 		# Saves histogram to json file at interval
 		if te - tla >= t_interval:
 			settings 		= fn.load_settings()
-			filename        = settings[1]
+			spectrum_name   = settings[1]
 			max_counts      = settings[9]
 			max_seconds		= settings[26]
 			coeff_1			= settings[18]
@@ -139,15 +154,15 @@ def pulsecatcher(mode):
 			global_cps = int(global_cps/t_interval)
 			
 			if mode == 2:
-				fn.write_histogram_json(t0, t1, bins, global_counts, int(elapsed), filename, histogram, coeff_1, coeff_2, coeff_3)
+				fn.write_histogram_json(t0, t1, bins, global_counts, int(elapsed), spectrum_name, histogram, coeff_1, coeff_2, coeff_3)
 				tla = time.time()
 
 			if mode == 3:
-				fn.write_3D_intervals_json(t0, t1, bins, global_counts, int(elapsed), filename, histogram_3d, coeff_1, coeff_2, coeff_3)
+				fn.write_3D_intervals_json(t0, t1, bins, global_counts, int(elapsed), spectrum_name, histogram_3d, coeff_1, coeff_2, coeff_3)
 				histogram_3d = [0] * bins
 				tla = time.time()
 
-			fn.write_cps_json(filename, global_cps)
+			fn.write_cps_json(spectrum_name, global_cps)
 			global_cps = 0
 	
 	p.terminate() # closes stream when done

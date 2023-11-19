@@ -98,8 +98,8 @@ def show_tab2():
             html.Button('START', id='start'),
             html.Div(id='start_text', children=''),
             html.Div(id='counts', children= '', style={'font-size': '24px'}),
-            html.Div(''),
             html.Div(['Max Counts', dcc.Input(id='max_counts', type='number', step=1000,  readOnly=False, value=max_counts)]),
+            html.Div(['Continue Spectrum', daq.BooleanSwitch(id='continue_switch',on=True, color='purple',)]),
             ]),
 
         html.Div(id='t2_setting_div2', children=[            
@@ -181,21 +181,22 @@ def show_tab2():
 
 #------START---------------------------------
 
-@app.callback( Output('start_text'  ,'children'),
-                [Input('start'      ,'n_clicks')])
+@app.callback(Output('start_text'       ,'children'),
+              [Input('start'            ,'n_clicks'),
+               Input('continue_switch'  ,'on')])
 
-def update_output(n_clicks):
+def update_output(n_clicks, continue_spectrum):
     if n_clicks is None:
         raise PreventUpdate
     else:
         mode = 2      
         fn.clear_global_cps_list()
-        pc.pulsecatcher(mode)
+        pc.pulsecatcher(mode, continue_spectrum)
         return ''
 #----STOP------------------------------------------------------------
 
 @app.callback( Output('stop_text'  ,'children'),
-                [Input('stop'      ,'n_clicks')])
+               [Input('stop'      ,'n_clicks')])
 
 def update_output(n_clicks):
     if n_clicks is None:
@@ -428,7 +429,7 @@ def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, compariso
         if log_switch == True:
             fig.update_layout(yaxis=dict(autorange=False, type='log', range=[0, max_log_value+0.3])) 
 
-        return fig, f'{validPulseCount}', f'{elapsed}', f'cps {cps}'
+        return fig, f'{validPulseCount}', f'{elapsed}', f'cps {cps:.2f}'
 
     else:
         layout = go.Layout(
