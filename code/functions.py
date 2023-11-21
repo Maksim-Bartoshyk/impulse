@@ -22,7 +22,7 @@ from urllib.request import urlopen
 cps_list = []
 
 def log_info(msg):
-    print(f'{time.time()} INFO: {msg}')
+    print(f'{time.time():.7f} INFO: {msg}')
     
     return
 
