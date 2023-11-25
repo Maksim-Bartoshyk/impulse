@@ -47,16 +47,11 @@ def show_tab2():
     settings        = fn.load_settings()
 
     spectrum_name   = settings[1]
-    device          = settings[2]             
-    sample_rate     = settings[3]
-    chunk_size      = settings[4]
     threshold       = settings[5]
     tolerance       = settings[6]
     bins            = settings[7]
     bin_size        = settings[8]
     max_counts      = settings[9]
-    shapestring     = settings[10]
-    sample_length   = settings[11]
 
     calib_bin_1     = settings[12]
     calib_bin_2     = settings[13]
@@ -273,13 +268,10 @@ def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, compariso
                 y = [i * count for i, count in enumerate(spectrum)]
                 gc= [i * count for i, count in enumerate(gc)]
 
-            trace1 = go.Scatter(
+            trace1 = go.Bar(
                 x=x, 
                 y=y, 
-                mode='lines+markers', 
-                fill='tozeroy' ,  
-                marker={'color': 'darkblue', 'size':3}, 
-                line={'width':1})
+                marker={'color': 'darkblue'}) 
 
   #-------------------annotations-----------------------------------------------          
             peaks, fwhm = fn.peakfinder(y, prominence, peakfinder)
@@ -385,12 +377,10 @@ def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, compariso
                     if epb_switch == True:
                         y2 = [i * n * steps for i, n in enumerate(spectrum_2)]
 
-                    trace2 = go.Scatter(
+                    trace2 = go.Bar(
                         x=x2, 
                         y=y2, 
-                        mode='lines+markers',  
-                        marker={'color': 'red', 'size':1}, 
-                        line={'width':2})
+                        marker={'color': 'red'})
 
         if sigma == 0:
             trace4 = {}
@@ -410,14 +400,10 @@ def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, compariso
 
         if difference_switch == True:
             y3 = [a - b for a, b in zip(y, y2)]
-            trace3 = go.Scatter(
+            trace3 = go.Bar(
                             x=x, 
-                            y=y3, 
-                            mode='lines+markers', 
-                            fill='tozeroy',  
-                            marker={'color': 'green', 'size':3}, 
-                            line={'width':1}
-                            )
+                            y=y3,  
+                            marker={'color': 'green'})
 
             fig = go.Figure(data=[trace3], layout=layout)
 

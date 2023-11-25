@@ -95,16 +95,16 @@ app.layout = html.Div([
         #style={'fontWeight': 'bold'}, 
         children=[
             dcc.Tab(
-                label= 'Settings & Control', 
+                label= 'Device Settings', 
                 value= 'tab1'),
             dcc.Tab(
-                label='2D Pulse Height Histogram', 
+                label='Spectrum', 
                 value='tab2'), 
             dcc.Tab(
-                label='3D Pulse Height Histogram', 
+                label='Waterfall', 
                 value='tab3'),      
             dcc.Tab(
-                label='Count Rate Histogram', 
+                label='Count Rate', 
                 value='tab4'),
             dcc.Tab(
                 label='Export, Exit and Manual', 

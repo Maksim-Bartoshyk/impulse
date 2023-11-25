@@ -22,15 +22,13 @@ path = None
 n_clicks = None
 global_counts = 0
 
-data_directory  = os.path.join(os.path.expanduser("~"), "impulse_data")
-
 global cps_list
 
 def show_tab3():
 
     # Get all filenames in data folder and its subfolders
-    files = [os.path.relpath(file, data_directory).replace("\\", "/")
-             for file in glob.glob(os.path.join(data_directory, "**", "*.json"), recursive=True)]
+    files = [os.path.relpath(file, fn.get_data_dir()).replace("\\", "/")
+             for file in glob.glob(os.path.join(fn.get_data_dir(), "**", "*.json"), recursive=True)]
     # Add "i/" prefix to subfolder filenames for label and keep the original filename for value
     options = [{'label': "~ " + os.path.basename(file), 'value': file} if "i/" in file and file.endswith(".json") 
                 else {'label': os.path.basename(file), 'value': file} for file in files]
@@ -43,34 +41,10 @@ def show_tab3():
         file['label'] = file['label'].replace('.json', '')
         file['value'] = file['value'].replace('.json', '')
 
-    database = fn.get_path(f'{data_directory}/.data.db')
-    conn            = sql.connect(database)
-    c               = conn.cursor()
-    query           = "SELECT * FROM settings "
-    c.execute(query) 
+    settings        = fn.load_settings()
 
-    settings        = c.fetchall()[0]
-
-    filename        = settings[1]
-    device          = settings[2]             
-    sample_rate     = settings[3]
-    chunk_size      = settings[4]
-    threshold       = settings[5]
-    tolerance       = settings[6]
-    bins            = settings[7]
-    bin_size        = settings[8]
+    spectrum_name   = settings[1]
     max_counts      = settings[9]
-    shapestring     = settings[10]
-    sample_length   = settings[11]
-    calib_bin_1     = settings[12]
-    calib_bin_2     = settings[13]
-    calib_bin_3     = settings[14]
-    calib_e_1       = settings[15]
-    calib_e_2       = settings[16]
-    calib_e_3       = settings[17]
-    coeff_1         = settings[18]
-    coeff_2         = settings[19]
-    coeff_3         = settings[20]
     max_seconds     = settings[26]
     t_interval      = settings[27]
 
@@ -80,12 +54,12 @@ def show_tab3():
         html.Div(id='polynomial_3d', children=''),
         html.Div(id='bar_chart_div_3d', children=[
             dcc.Graph(id='chart_3d', figure={},),
-            dcc.Interval(id='interval-component', interval= refresh_rate, n_intervals=0)  # Refresh rate 1s.
+            dcc.Interval(id='interval-component', interval=refresh_rate, n_intervals=0)
             ]),
 
         html.Div(id='t2_filler_div', children=''),
         html.Div(id='t2_setting_div', children=[
-            html.Button('START', id='start_3d'),    #Start button
+            html.Button('START', id='start_3d'),
             html.Div(id='counts_3d', children= ''),
             html.Div(id='start_text_3d' , children =''),
             html.Div(['Max Counts', dcc.Input(id='max_counts', type='number', step=1000, readOnly=False, value=max_counts )]),
@@ -100,15 +74,10 @@ def show_tab3():
             ]),
 
         html.Div(id='t2_setting_div3', children=[
-            html.Div(['File name:', dcc.Input(id='filename' ,type='text' ,value=filename )]),
-            html.Div(['Number of bins:', dcc.Input(id='bins'        ,type='number'  ,value=bins )]),
-            html.Div(['Bin size      :', dcc.Input(id='bin_size'    ,type='number'  ,value=bin_size )]),
+            html.Div(['File name:', dcc.Input(id='spectrum_name' ,type='text' ,value=spectrum_name )]),
             ]), 
 
         html.Div(id='t2_setting_div4', children=[
-            
-            html.Div(['LLD Threshold:', dcc.Input(id='threshold', type='number', step=10, value=threshold )]),
-            html.Div(['Shape Tolerance:', dcc.Input(id='tolerance', type='number', step=1000,  value=tolerance )]),
             html.Div(['Update Interval(s)', dcc.Input(id='t_interval', type='number', step=1,  readOnly=False, value=t_interval )]),
             ]),
 
@@ -120,21 +89,7 @@ def show_tab3():
             html.Div(['Show log(y)'     , daq.BooleanSwitch(id='log_switch',on=False, color='purple',)]),
             html.Div(['Calibration'    , daq.BooleanSwitch(id='cal_switch',on=False, color='purple',)]),
             ]), 
-
-        html.Div(id='t2_setting_div7', children=[
-            html.Div('Calibration Bins'),
-            html.Div(dcc.Input(id='calib_bin_1', type='number', value=calib_bin_1)),
-            html.Div(dcc.Input(id='calib_bin_2', type='number', value=calib_bin_2)),
-            html.Div(dcc.Input(id='calib_bin_3', type='number', value=calib_bin_3)),
-            ]),
-
-        html.Div(id='t2_setting_div8', children=[
-            html.Div('Energies'),
-            html.Div(dcc.Input(id='calib_e_1', type='number', value=calib_e_1)),
-            html.Div(dcc.Input(id='calib_e_2', type='number', value=calib_e_2)),
-            html.Div(dcc.Input(id='calib_e_3', type='number', value=calib_e_3)),            
-            ]),
-
+            
         html.Div(children=[ html.Img(id='footer', src='https://www.gammaspectacular.com/steven/impulse/footer.gif')]),
         
         html.Div(id='subfooter', children=[
@@ -147,7 +102,7 @@ def show_tab3():
 #------START---------------------------------
 
 @app.callback( Output('start_text_3d'  ,'children'),
-                [Input('start_3d'  ,'n_clicks')])
+               [Input('start_3d'       ,'n_clicks')])
 
 def update_output(n_clicks):
 
@@ -157,7 +112,7 @@ def update_output(n_clicks):
     else:
         mode = 3       
         fn.clear_global_cps_list()
-        pc.pulsecatcher(mode)
+        pc.pulsecatcher(mode, False )
 
         return " "
 #----STOP------------------------------------------------------------
@@ -182,7 +137,7 @@ def update_output(n_clicks):
                 Output('elapsed_3d'         ,'children'),
                 Output('cps_3d'             ,'children')],
                [Input('interval-component'  ,'n_intervals'), 
-                Input('filename'            ,'value'), 
+                Input('spectrum_name'       ,'value'), 
                 Input('epb_switch'          ,'on'),
                 Input('log_switch'          ,'on'),
                 Input('cal_switch'          ,'on'),
@@ -191,7 +146,7 @@ def update_output(n_clicks):
                 ])
 
 
-def update_graph(n, filename, epb_switch, log_switch, cal_switch, active_tab, t_interval):
+def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, active_tab, t_interval):
 
     if active_tab != 'tab3':
         raise PreventUpdate
@@ -207,31 +162,12 @@ def update_graph(n, filename, epb_switch, log_switch, cal_switch, active_tab, t_
     
     global global_counts
     
-    histogram3 = fn.get_path(f'{data_directory}/{filename}_3d.json')
+    histogram3 = fn.get_file_path(f'{spectrum_name}_3d.json')
 
     now = datetime.now()
     time = now.strftime("%A %d %B %Y")
 
-    title_text = "<b>{}</b><br><span style='font-size: 12px'>{}</span>".format(filename, time)
-
-    layout = go.Layout(
-            uirevision='nochange',
-            height=550,
-            margin=dict(l=0, r=0, b=0, t=0),
-            scene=dict(
-                xaxis=dict(title='Energy(x)'),
-                yaxis=dict(title='Seconds(y)'),
-                zaxis=dict(title='Counts(z)', type= axis_type),
-            ),
-            title={
-                'text': title_text,
-                'x': 0.9,
-                'y': 0.9,
-                'xanchor': 'center',
-                'yanchor': 'top',
-                'font': {'family': 'Arial', 'size': 24, 'color': 'black'},
-                }
-        )
+    title_text = "<b>{}</b><br><span style='font-size: 12px'>{}</span>".format(spectrum_name, time)
 
     if os.path.exists(histogram3):
         with open(histogram3, "r") as f:
@@ -247,152 +183,60 @@ def update_graph(n, filename, epb_switch, log_switch, cal_switch, active_tab, t_
 
         if elapsed == 0:
             global_cps = 0  
-
         else:
             global_cps = int((validPulseCount - global_counts)/t_interval)
             global_counts = validPulseCount 
 
         x = list(range(numberOfChannels))
-        y = spectra
-
-        if epb_switch == True:
-            # Multiply each number by its index
-            y = [[num * index for index, num in enumerate(inner_list)] for inner_list in spectra]
-
-        if cal_switch == True:
-                x = np.polyval(np.poly1d(coefficients), x)
-
-
-        traces = []
-
-        for i in range(len(y)):
-            z = [i] * len(y)
-
-            trace = {
-                'type': 'scatter3d',
-                'showlegend': False  # Hide the trace index in legend
-            }
-
-            traces.append(trace)
-
-        surface_trace = {
-            'type': 'surface',
-            'x': x,
-            'y': list(range(len(y))),
-            'z': y,
-            'colorscale': 'Rainbow',
-            'showlegend': False  # Hide the trace index in legend
-        }
-
-        traces.append(surface_trace)
-
-        fig = go.Figure(data=traces, layout=layout)
+        y = list(range(len(spectra)))
+        z = spectra
+        scale = [[0, 'blue'], [0.33, 'green'], [0.66, 'yellow'], [1, 'red']]
+        
+        if log_switch:
+            scale = [[0, 'blue'], [0.01, 'green'], [0.1, 'yellow'], [1, 'red']]
+            
+        data = go.Heatmap(x = x, y = y, z = z, colorscale = scale)
+        fig = go.Figure(data = data)
 
         return fig, f'{validPulseCount}', f'{elapsed}', f'cps {global_cps}'
 
     else:
+        x = []
+        y = []
+        z = []
+        scale = [[0, 'blue'], [0.33, 'green'], [0.66, 'yellow'], [1, 'red']]
         
-        data = [
-            go.Scatter3d(
-                x=[0],  # x-coordinate of the data point
-                y=[0],  # y-coordinate of the data point
-                z=[0],  # z-coordinate of the data point
-                mode='markers',
-                marker=dict(
-                    size=5,
-                    color='blue'
-                )
-            )
-        ]
-
-        fig = go.Figure(data=data, layout=layout)  
+        if log_switch:
+            scale = [[0, 'blue'], [0.01, 'green'], [0.1, 'yellow'], [1, 'red']]
+            
+        data = go.Heatmap(x = x, y = y, z = z, colorscale = scale)
+        fig = go.Figure(data = data)
 
         return fig, 0, 0, 0
 
 #--------UPDATE SETTINGS------------------------------------------------------------------------------------------
 @app.callback( Output('polynomial_3d'   ,'children'),
-               [Input('bins'            ,'value'),
-                Input('bin_size'        ,'value'),
-                Input('max_counts'      ,'value'),
+               [Input('max_counts'      ,'value'),
                 Input('max_seconds'     ,'value'),
                 Input('t_interval'      ,'value'),
-                Input('filename'        ,'value'),
-                Input('threshold'       ,'value'),
-                Input('tolerance'       ,'value'),
-                Input('calib_bin_1'     ,'value'),
-                Input('calib_bin_2'     ,'value'),
-                Input('calib_bin_3'     ,'value'),
-                Input('calib_e_1'       ,'value'),
-                Input('calib_e_2'       ,'value'),
-                Input('calib_e_3'       ,'value'),
+                Input('spectrum_name'   ,'value'),
                 ])  
 
-def save_settings(bins, bin_size, max_counts, max_seconds, t_interval, filename, threshold, tolerance, calib_bin_1, calib_bin_2, calib_bin_3, calib_e_1, calib_e_2, calib_e_3):
+def save_settings(max_counts, max_seconds, t_interval, spectrum_name):
     
-    database = fn.get_path(f'{data_directory}/.data.db')
+    database = fn.get_file_path('.data.db')
 
     conn = sql.connect(database)
     c = conn.cursor()
 
     query = f"""UPDATE settings SET 
-                    bins={bins}, 
-                    bin_size={bin_size}, 
                     max_counts={max_counts},
                     max_seconds={max_seconds}, 
-                    name='{filename}', 
-                    threshold={threshold}, 
-                    tolerance={tolerance}, 
-                    calib_bin_1={calib_bin_1},
-                    calib_bin_2={calib_bin_2},
-                    calib_bin_3={calib_bin_3},
-                    calib_e_1={calib_e_1},
-                    calib_e_2={calib_e_2},
-                    calib_e_3={calib_e_3},
+                    name='{spectrum_name}', 
                     t_interval={t_interval}
                     WHERE id=0;"""
 
     c.execute(query)
     conn.commit()
 
-    x_bins        = [calib_bin_1, calib_bin_2, calib_bin_3]
-    x_energies    = [calib_e_1, calib_e_2, calib_e_3]
-
-    coefficients  = np.polyfit(x_bins, x_energies, 2)
-    polynomial_fn = np.poly1d(coefficients)
-
-
-    conn  = sql.connect(database)
-    c     = conn.cursor()
-
-    query = f"""UPDATE settings SET 
-                    coeff_1={float(coefficients[0])},
-                    coeff_2={float(coefficients[1])},
-                    coeff_3={float(coefficients[2])}
-                    WHERE id=0;"""
-    
-    c.execute(query)
-    conn.commit()
-
-    return f'Polynomial (ax^2 + bx + c) = ({polynomial_fn})'
-
-#------UPDATE CALIBRATION OF EXISTING SPECTRUM-------------------
-
-@app.callback(
-    Output('3d_update_calib_message','children'),
-    [Input('update_calib_button' ,'n_clicks'),
-    Input('filename'         ,'value')
-    ])
-
-def update_current_calibration(n_clicks, filename):
-    if n_clicks is None:
-        raise PreventUpdate
-    else:
-        settings        = fn.load_settings()
-        coeff_1         = round(settings[18],6)
-        coeff_2         = round(settings[19],6)
-        coeff_3         = round(settings[20],6)
-
-        # Update the calibration coefficients using the specified values
-        fn.update_coeff(filename, coeff_1, coeff_2, coeff_3)
-        # Return a message indicating that the update was successful
-        return f"Update {n_clicks}"
+    return ''
