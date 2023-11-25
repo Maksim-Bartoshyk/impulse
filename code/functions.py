@@ -12,6 +12,7 @@ import json
 import time
 import os
 import platform
+import threading
 import sqlite3 as sql
 import pandas as pd
 from scipy.signal import find_peaks, peak_widths
@@ -116,6 +117,10 @@ def write_histogram_json(t0, t1, bins, counts, elapsed, name, histogram, coeff_1
 
     with open(jsonfile, "w+") as f:
         json.dump(data, f)
+        
+def write_histogram_json_async(t0, t1, bins, counts, elapsed, name, histogram, coeff_1, coeff_2, coeff_3):
+    save_thread = threading.Thread(target=write_histogram_json, args=[t0, t1, bins, counts, elapsed, name, histogram, coeff_1, coeff_2, coeff_3])
+    save_thread.start()
 
 # This function writes 3D intervals to JSON file according to NPESv1 schema.
 def write_3D_intervals_json(t0, t1, bins, counts, elapsed, name, interval_number, coeff_1, coeff_2, coeff_3):
@@ -151,6 +156,10 @@ def write_3D_intervals_json(t0, t1, bins, counts, elapsed, name, interval_number
 
     with open(jsonfile, "w") as f:
         json.dump(data, f)
+        
+def write_3D_intervals_json_async(t0, t1, bins, counts, elapsed, name, interval_number, coeff_1, coeff_2, coeff_3):
+    save_thread = threading.Thread(target=write_3D_intervals_json, args=[t0, t1, bins, counts, elapsed, name, interval_number, coeff_1, coeff_2, coeff_3])
+    save_thread.start()
 
 def write_cps_json(name, cps):
     global cps_list
@@ -159,6 +168,10 @@ def write_cps_json(name, cps):
     data     = {'cps': cps_list }
     with open(jsonfile, "w+") as f:
         json.dump(data, f)
+        
+def write_cps_json_async(name, cps):
+    save_thread = threading.Thread(target=write_cps_json, args=[name, cps])
+    save_thread.start()
   
 def clear_global_cps_list():
     global cps_list

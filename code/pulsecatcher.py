@@ -158,13 +158,13 @@ def pulsecatcher(mode, continue_spectrum):
 			global_cps = int(global_cps/t_interval)
 			
 			if mode == 2:
-				fn.write_histogram_json(t0, t1, bins, global_counts, int(elapsed), spectrum_name, histogram, coeff_1, coeff_2, coeff_3)
+				fn.write_histogram_json_async(t0, t1, bins, global_counts, int(elapsed), spectrum_name, histogram, coeff_1, coeff_2, coeff_3)
 
 			if mode == 3:
-				fn.write_3D_intervals_json(t0, t1, bins, global_counts, int(elapsed), spectrum_name, histogram_3d, coeff_1, coeff_2, coeff_3)
+				fn.write_3D_intervals_json_async(t0, t1, bins, global_counts, int(elapsed), spectrum_name, histogram_3d, coeff_1, coeff_2, coeff_3)
 				histogram_3d = [0] * bins
 
-			fn.write_cps_json(spectrum_name, global_cps)
+			fn.write_cps_json_async(spectrum_name, global_cps)
 			global_cps = 0
 			
 			fn.log_info(f'files updated, buffers read: {buffers_read_interval}')
