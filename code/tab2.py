@@ -1,7 +1,7 @@
 import dash
 import plotly.graph_objs as go
-import pulsecatcher as pc
 import functions as fn
+import pulsecatcher as pc
 import os
 import json
 import glob
@@ -16,12 +16,11 @@ from server import app
 from dash.exceptions import PreventUpdate
 from datetime import datetime
 
-path = None
-n_clicks = None
 global_counts = 0
 global_cps = 0
 
 def show_tab2():
+    fn.log_info('tab2 render start')
 
     global global_counts
     global global_cps
@@ -88,9 +87,9 @@ def show_tab2():
             ]),
 
         html.Div(id='t2_filler_div', children=''),
-        #Start button
+
         html.Div(id='t2_setting_div1', children=[
-            html.Button('START', id='start'),
+            html.Button('START', id='start', disabled=pc.is_capturing()),
             html.Div(id='start_text', children=''),
             html.Div(id='counts', children= '', style={'font-size': '24px'}),
             html.Div(['Max Counts', dcc.Input(id='max_counts', type='number', step=1000,  readOnly=False, value=max_counts)]),
@@ -98,11 +97,12 @@ def show_tab2():
             ]),
 
         html.Div(id='t2_setting_div2', children=[            
-            html.Button('STOP', id='stop'), 
+            html.Button('STOP', id='stop', disabled=not pc.is_capturing()), 
             html.Div(id='stop_text', children=''),
             html.Div(id='elapsed', children= '', style={'font-size': '24px'}),
             html.Div(['Max Seconds', dcc.Input(id='max_seconds', type='number', step=60,  readOnly=False, value=max_seconds)]),
             html.Div(id='cps', children=''),
+            html.Div(id='status', children=get_capturing_status()),
             ]),
 
         html.Div(id='t2_setting_div3', children=[
@@ -172,40 +172,73 @@ def show_tab2():
 
     ]) # End of tab 2 render
 
+    fn.log_info('tab2 render end')
     return html_tab2
+    
 
 #------START---------------------------------
 
-@app.callback(Output('start_text'       ,'children'),
-              [Input('start'            ,'n_clicks'),
-               Input('continue_switch'  ,'on')])
+@app.callback([ 
+                Output('start'            ,'disabled', allow_duplicate=True),
+                Output('stop'             ,'disabled', allow_duplicate=True),
+                Output('status'           ,'children', allow_duplicate=True)
+              ],
+              [ 
+                Input('start'             ,'n_clicks'),
+                Input('continue_switch'   ,'on') # BUG: callback is triggered when switch changed
+              ], 
+                prevent_initial_call=True)
 
 def update_output(n_clicks, continue_spectrum):
     if n_clicks is None:
         raise PreventUpdate
     else:
+        fn.log_info('start button click')
+        if pc.is_capturing():
+            raise PreventUpdate
+        
         mode = 2      
         fn.clear_global_cps_list()
-        pc.pulsecatcher(mode, continue_spectrum)
-        return ''
+        pc.start_capture(mode, continue_spectrum)
+        
+        return pc.is_capturing(), not pc.is_capturing(), get_capturing_status()
+
+
 #----STOP------------------------------------------------------------
 
-@app.callback( Output('stop_text'  ,'children'),
-               [Input('stop'      ,'n_clicks')])
+@app.callback([ 
+                Output('start'            ,'disabled', allow_duplicate=True),
+                Output('stop'             ,'disabled', allow_duplicate=True),
+                Output('status'           ,'children', allow_duplicate=True)
+              ],
+              [
+                Input('stop'              ,'n_clicks')
+              ],
+                prevent_initial_call=True)
 
 def update_output(n_clicks):
     if n_clicks is None:
         raise PreventUpdate
     else:
-        fn.stop_recording()
-        return " "
+        fn.log_info('stop button click')
+        pc.stop_capture()
+                
+        return False, True, get_capturing_status()
+
+
 #-------UPDATE GRAPH---------------------------------------------------------
 
-@app.callback([ Output('bar-chart'          ,'figure'), 
+@app.callback([ 
+                Output('bar-chart'          ,'figure'), 
                 Output('counts'             ,'children'),
                 Output('elapsed'            ,'children'),
-                Output('cps'                ,'children')],
-               [Input('interval-component'  ,'n_intervals'), 
+                Output('cps'                ,'children'),
+                Output('start'              ,'disabled'),
+                Output('stop'               ,'disabled'),
+                Output('status'             ,'children')
+              ],
+              [ 
+                Input('interval-component'  ,'n_intervals'), 
                 Input('spectrum_name'       ,'value'), 
                 Input('epb_switch'          ,'on'),
                 Input('log_switch'          ,'on'),
@@ -216,10 +249,9 @@ def update_output(n_clicks):
                 Input('peakfinder'          ,'value'),
                 Input('sigma'               ,'value'),
                 Input('tabs'                ,'value')
-                ])
+               ])
 
 def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, comparison_name, compare_switch, difference_switch, peakfinder, sigma, active_tab):
-
     if active_tab != 'tab2':  # only update the chart when "tab2" is active
         raise PreventUpdate
 
@@ -377,10 +409,11 @@ def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, compariso
                     if epb_switch == True:
                         y2 = [i * n * steps for i, n in enumerate(spectrum_2)]
 
-                    trace2 = go.Bar(
+                    trace2 = go.Scatter(
                         x=x2, 
                         y=y2, 
-                        marker={'color': 'red'})
+                        marker={'color': 'gray'},
+                        line={'width':1})
 
         if sigma == 0:
             trace4 = {}
@@ -415,8 +448,7 @@ def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, compariso
         if log_switch == True:
             fig.update_layout(yaxis=dict(autorange=False, type='log', range=[0, max_log_value+0.3])) 
 
-        return fig, f'{validPulseCount}', f'{elapsed}', f'cps {cps:.2f}'
-
+        return fig, f'{validPulseCount}', f'{elapsed}', f'cps {cps:.2f}', pc.is_capturing(), not pc.is_capturing(), get_capturing_status()
     else:
         layout = go.Layout(
                 paper_bgcolor = 'white', 
@@ -435,9 +467,11 @@ def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, compariso
                 yaxis=dict(autorange=True),
                 uirevision="Don't change",
                 )
-        return go.Figure(data=[], layout=layout), 0, 0, 0
+        return go.Figure(data=[], layout=layout), 0, 0, 0, pc.is_capturing(), not pc.is_capturing(), get_capturing_status()
+
 
 #--------UPDATE SETTINGS------------------------------------------------------------------------------------------
+
 @app.callback( Output('polynomial'      ,'children'),
                 [Input('bins'           ,'value'),
                 Input('bin_size'        ,'value'),
@@ -509,6 +543,7 @@ def save_settings(bins, bin_size, max_counts, max_seconds, spectrum_name, compar
 
     return f'Polynomial (ax^2 + bx + c) = ({polynomial_fn})'
 
+
 #-------PLAY SOUND ---------------------------------------------
 
 @app.callback(Output('audio'            ,'children'),
@@ -536,6 +571,7 @@ def play_sound(n_clicks, comparison_name):
         asp.play_wav_file(comparison_name)
     return
 
+
 #------UPDATE CALIBRATION OF EXISTING SPECTRUM-------------------
 
 @app.callback(
@@ -557,3 +593,10 @@ def update_current_calibration(n_clicks, spectrum_name):
         fn.update_coeff(spectrum_name, coeff_1, coeff_2, coeff_3)
         # Return a message indicating that the update was successful
         return f"Update {n_clicks}"
+        
+def get_capturing_status():
+    status = 'stopped'
+    if pc.is_capturing():
+        status = 'capturing'
+        
+    return status

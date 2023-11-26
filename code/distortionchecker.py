@@ -11,9 +11,6 @@ import csv
 
 data 			= None
 left_channel 	= None
-device_list 	= fn.get_device_list()
-path 			= None
-plot 			= {}
 
 # Function to catch pulses and output time, pulkse height and distortion
 def distortion_finder():

@@ -348,32 +348,6 @@ def gaussian_correl(data, sigma):
     # Return the list of correlation values
     return correl_values
 
-def stop_recording():
-
-    # This function is an ugly botch but it works
-    # To stop the while loop we first get max counts
-    # then zeroise max counts
-    # then put the original number back again
-
-    database = get_file_path(f'.data.db')
-    conn     = sql.connect(database)
-    query1  = "SELECT max_counts FROM settings "
-    c       = conn.cursor()
-    c.execute(query1)
-    conn.commit()
-    max_counts = c.fetchall()[0][0]
-    query2 = "UPDATE settings SET max_counts = 0 WHERE ID = 0;"
-    c      = conn.cursor()
-    c.execute(query2)
-    conn.commit()
-    time.sleep(10)
-    # Wait three seconds and set max_counts back to what it was
-    query3    = f"UPDATE settings SET max_counts = {max_counts} WHERE ID = 0;"
-    c         = conn.cursor()
-    c.execute(query3)
-    conn.commit()
-    return    
-
 def export_csv(filename):
     # Get the path to the user's download folder
     download_folder = os.path.expanduser("~/Downloads")
@@ -401,6 +375,28 @@ def export_csv(filename):
             # Calculate energies
             e = round((i**coefficients[2] + i*coefficients[1]+coefficients[0]),2)
             writer.writerow([e, value])   
+    return
+
+def export_bqmon_csv(filename):
+    # Get the path to the user's download folder
+    download_folder = os.path.expanduser("~/Downloads")
+    # Remove the ".json" extension from the filename
+    base_filename = filename.rsplit(".", 1)[0]
+    # Give output file a name
+    output_file = f'{base_filename}.csv'
+    # Load json file
+    with open(get_file_path(filename)) as f:
+        data = json.load(f)
+    # Extract data from json file
+    spectrum     = data["resultData"]["energySpectrum"]["spectrum"]
+    # Open file in Download directory
+    with open(os.path.join(download_folder, output_file), "w", newline="") as f:
+        # Write to file
+        writer = csv.writer(f)
+        # Write each row
+        for i, value in enumerate(spectrum):
+            writer.writerow([i, value])   
+            
     return
 
 def update_coeff(name, coeff_1, coeff_2, coeff_3):

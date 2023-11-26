@@ -16,6 +16,8 @@ from server import app
 # ----------- Audio input selection ---------------------------------
 
 def show_tab1():
+    fn.log_info('tab1 render start')
+    
     settings = fn.load_settings()
 
     name            = settings[1]
@@ -177,6 +179,7 @@ def show_tab1():
     ]) # tab1 ends here
     ]),
 
+    fn.log_info('tab1 render end')
     return tab1
 
 # Callback to save settings ---------------------------

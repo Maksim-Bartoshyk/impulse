@@ -18,13 +18,12 @@ from server import app
 from dash.exceptions import PreventUpdate
 from datetime import datetime
 
-path = None
-n_clicks = None
-global_counts = 0
 
+global_counts = 0
 global cps_list
 
 def show_tab3():
+    fn.log_info('tab3 render start')
 
     # Get all filenames in data folder and its subfolders
     files = [os.path.relpath(file, fn.get_data_dir()).replace("\\", "/")
@@ -59,18 +58,18 @@ def show_tab3():
 
         html.Div(id='t2_filler_div', children=''),
         html.Div(id='t2_setting_div', children=[
-            html.Button('START', id='start_3d'),
-            html.Div(id='counts_3d', children= ''),
+            html.Button('START', id='start_3d', disabled=pc.is_capturing()),
+            html.Div(id='counts_3d', children= '', style={'font-size': '24px'}),
             html.Div(id='start_text_3d' , children =''),
             html.Div(['Max Counts', dcc.Input(id='max_counts', type='number', step=1000, readOnly=False, value=max_counts )]),
             ]),
 
         html.Div(id='t2_setting_div', children=[            
-            html.Button('STOP', id='stop_3d'),
-            html.Div(id='elapsed_3d', children= '' ),
+            html.Button('STOP', id='stop_3d', disabled=not pc.is_capturing()),
+            html.Div(id='elapsed_3d', children= '', style={'font-size': '24px'}),
             html.Div(['Max Seconds', dcc.Input(id='max_seconds', type='number', step=60,  readOnly=False, value=max_seconds )]),
             html.Div(id='cps_3d', children=''),
-            html.Div(id='stop_text_3d', children= ''),
+            html.Div(id='status_3d', children=get_capturing_status()),
             ]),
 
         html.Div(id='t2_setting_div3', children=[
@@ -97,28 +96,44 @@ def show_tab3():
 
         ]) # End of tab 3 render
 
+    fn.log_info('tab3 render end')
     return html_tab3
 
 #------START---------------------------------
 
-@app.callback( Output('start_text_3d'  ,'children'),
-               [Input('start_3d'       ,'n_clicks')])
+@app.callback([ 
+                Output('start_3d'            ,'disabled', allow_duplicate=True),
+                Output('stop_3d'             ,'disabled', allow_duplicate=True),
+                Output('status_3d'           ,'children', allow_duplicate=True)
+              ],
+              [ 
+                Input('start_3d'             ,'n_clicks')
+              ],
+                prevent_initial_call=True)
 
 def update_output(n_clicks):
-
     if n_clicks is None:
         raise PreventUpdate
 
     else:
         mode = 3       
         fn.clear_global_cps_list()
-        pc.pulsecatcher(mode, False )
+        pc.start_capture(mode, False)
 
-        return " "
+        return pc.is_capturing(), not pc.is_capturing(), get_capturing_status()
+        
+        
 #----STOP------------------------------------------------------------
 
-@app.callback( Output('stop_text_3d'  ,'children'),
-                [Input('stop_3d'      ,'n_clicks')])
+@app.callback([ 
+                Output('start_3d'            ,'disabled', allow_duplicate=True),
+                Output('stop_3d'             ,'disabled', allow_duplicate=True),
+                Output('status_3d'           ,'children', allow_duplicate=True)
+              ],
+              [ 
+                Input('stop_3d'              ,'n_clicks')
+              ],
+                prevent_initial_call=True)
 
 def update_output(n_clicks):
 
@@ -126,24 +141,31 @@ def update_output(n_clicks):
         raise PreventUpdate
 
     else:
-        fn.stop_recording()
+        pc.stop_capture()
 
-        return " "
+        return pc.is_capturing(), not pc.is_capturing(), get_capturing_status()
+        
 
 #-----RENDER CHART-----------------------------------------------------------
 
-@app.callback([ Output('chart_3d'           ,'figure'), 
+@app.callback([ 
+                Output('chart_3d'           ,'figure'), 
                 Output('counts_3d'          ,'children'),
                 Output('elapsed_3d'         ,'children'),
-                Output('cps_3d'             ,'children')],
-               [Input('interval-component'  ,'n_intervals'), 
+                Output('cps_3d'             ,'children'),
+                Output('start_3d'           ,'disabled'),
+                Output('stop_3d'            ,'disabled'),
+                Output('status_3d'          ,'children')
+              ],
+              [
+                Input('interval-component'  ,'n_intervals'), 
                 Input('spectrum_name'       ,'value'), 
                 Input('epb_switch'          ,'on'),
                 Input('log_switch'          ,'on'),
                 Input('cal_switch'          ,'on'),
                 Input('tabs'                ,'value'),
                 Input('t_interval'          ,'value')
-                ])
+              ])
 
 
 def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, active_tab, t_interval):
@@ -198,7 +220,7 @@ def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, active_ta
         data = go.Heatmap(x = x, y = y, z = z, colorscale = scale)
         fig = go.Figure(data = data)
 
-        return fig, f'{validPulseCount}', f'{elapsed}', f'cps {global_cps}'
+        return fig, f'{validPulseCount}', f'{elapsed}', f'cps {global_cps}', pc.is_capturing(), not pc.is_capturing(), get_capturing_status()
 
     else:
         x = []
@@ -212,7 +234,7 @@ def update_graph(n, spectrum_name, epb_switch, log_switch, cal_switch, active_ta
         data = go.Heatmap(x = x, y = y, z = z, colorscale = scale)
         fig = go.Figure(data = data)
 
-        return fig, 0, 0, 0
+        return fig, 0, 0, 0, pc.is_capturing(), not pc.is_capturing(), get_capturing_status()
 
 #--------UPDATE SETTINGS------------------------------------------------------------------------------------------
 @app.callback( Output('polynomial_3d'   ,'children'),
@@ -240,3 +262,10 @@ def save_settings(max_counts, max_seconds, t_interval, spectrum_name):
     conn.commit()
 
     return ''
+    
+def get_capturing_status():
+    status = 'stopped'
+    if pc.is_capturing():
+        status = 'capturing'
+        
+    return status

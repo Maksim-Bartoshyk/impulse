@@ -215,7 +215,7 @@ def export_histogram(filename):
 
     if filename is None:
         raise PreventUpdate
-    fn.export_csv(filename)
+    fn.export_bqmon_csv(filename)
 
     return f'{filename} exported as csv to ~/Downloads'
 

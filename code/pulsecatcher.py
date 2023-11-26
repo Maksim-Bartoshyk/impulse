@@ -6,6 +6,7 @@ import pyaudio
 import wave
 import math
 import time
+import threading
 import functions as fn
 import sqlite3 as sql
 import datetime
@@ -13,17 +14,48 @@ from collections import defaultdict
 import csv
 import json
 
-data 			= None
-left_channel 	= None
-path 			= None
-device_list 	= fn.get_device_list()
-plot 			= {}
-
+# TODO: do we really need this as global?
 global_cps      = 0
 global_counts	= 0
 
+capture_thread = None
+capture_cancellation_token = None
+
+def start_capture(mode, continue_spectrum):
+    global capture_thread
+    global capture_cancellation_token
+    
+    capture_cancellation_token = {'cancelled': False}
+    capture_thread = threading.Thread(target=pulsecatcher, args=[mode, continue_spectrum, capture_cancellation_token])
+    capture_thread.start()
+    
+    return
+    
+def stop_capture():
+    global capture_thread
+    global capture_cancellation_token
+    
+    if capture_thread is not None:
+        capture_cancellation_token['cancelled'] = True
+        capture_thread.join()
+    
+    return
+    
+def is_capturing():
+    global capture_thread
+    
+    return capture_thread is not None
+
 # Function reads audio stream and finds pulses then outputs time, pulse height and distortion
-def pulsecatcher(mode, continue_spectrum):
+def pulsecatcher(mode, continue_spectrum, cancellation_token):
+	global global_cps 
+	global global_counts 
+	global capture_thread
+	global capture_cancellation_token
+	
+	data 			= None
+	left_channel 	= None
+	
 	# Get the following from settings
 	settings 		= fn.load_settings()
 	spectrum_name   = settings[1]
@@ -62,17 +94,9 @@ def pulsecatcher(mode, continue_spectrum):
 	samples 	= []
 	pulses 		= []
 	left_data 	= []
-
-	p = pyaudio.PyAudio()
-
-	global global_cps 
-
+	
 	global_cps = 0
-
-	global global_counts 
-
 	global_counts = 0
-
 	already_elapsed = 0
 	
 	# Continue spectrum if exists
@@ -89,6 +113,7 @@ def pulsecatcher(mode, continue_spectrum):
 	elapsed = already_elapsed
 
 	# Open the selected audio input device
+	p = pyaudio.PyAudio()
 	stream = p.open(
 		format=audio_format,
 		channels=device_channels,
@@ -106,7 +131,7 @@ def pulsecatcher(mode, continue_spectrum):
 	t0				= datetime.datetime.now()
 	tb				= time.time()	#time beginning
 	tla             = time.time()
-	while condition and (global_counts < max_counts and elapsed <= max_seconds):
+	while (not cancellation_token['cancelled']) and (global_counts < max_counts and elapsed <= max_seconds):
 		# Read one chunk of audio data from stream into memory. 
 		data = stream.read(chunk_size, exception_on_overflow=False)
 		buffers_read_interval += 1
@@ -146,15 +171,6 @@ def pulsecatcher(mode, continue_spectrum):
 			tla = time.time()
 			t1 = datetime.datetime.now() # Time capture
 			elapsed = te - tb + already_elapsed
-			
-			settings 		= fn.load_settings()
-			spectrum_name   = settings[1]
-			max_counts      = settings[9]
-			max_seconds		= settings[26]
-			coeff_1			= settings[18]
-			coeff_2			= settings[19]
-			coeff_3			= settings[20]
-
 			global_cps = int(global_cps/t_interval)
 			
 			if mode == 2:
@@ -173,7 +189,15 @@ def pulsecatcher(mode, continue_spectrum):
 	
 	buffers_expected = int((elapsed - already_elapsed) * sample_rate / chunk_size)
 	buffers_lost = buffers_expected - buffers_read_total
-	fn.log_info(f'capture stopped, lost buffers: {buffers_lost} ({(buffers_lost/buffers_expected*100):.3}%)')
+	if buffers_expected == 0:
+		fn.log_info(f'capture stopped')
+	else:
+		fn.log_info(f'capture stopped, lost buffers: {buffers_lost} ({(buffers_lost/buffers_expected*100):.3}%)')
+	
 	p.terminate() # closes stream when done
+	
+	capture_thread = None
+	capture_cancellation_token = None
+		
 	return						
 											
