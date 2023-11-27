@@ -21,6 +21,11 @@ from urllib.request import urlopen
 
 cps_list = []
 
+def log_info(msg):
+    print(f'{time.time()} INFO: {msg}')
+    
+    return
+
 def get_data_dir():
     data_directory = os.path.join(os.path.expanduser("~"), "impulse_data")
 
@@ -348,7 +353,7 @@ def stop_recording():
     c      = conn.cursor()
     c.execute(query2)
     conn.commit()
-    time.sleep(3)
+    time.sleep(10)
     # Wait three seconds and set max_counts back to what it was
     query3    = f"UPDATE settings SET max_counts = {max_counts} WHERE ID = 0;"
     c         = conn.cursor()

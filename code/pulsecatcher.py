@@ -24,12 +24,6 @@ global_counts	= 0
 
 # Function reads audio stream and finds pulses then outputs time, pulse height and distortion
 def pulsecatcher(mode, continue_spectrum):
-
-	# Start timer
-	t0				= datetime.datetime.now()
-	tb				= time.time()	#time beginning
-	tla = 0
-
 	# Get the following from settings
 	settings 		= fn.load_settings()
 	spectrum_name   = settings[1]
@@ -104,9 +98,18 @@ def pulsecatcher(mode, continue_spectrum):
 		input_device_index=device,
 		frames_per_buffer=chunk_size)
 
+	fn.log_info('starting capture')
+	# Check processing performance
+	buffers_read_total = 0
+	buffers_read_interval = 0
+	# Start timer
+	t0				= datetime.datetime.now()
+	tb				= time.time()	#time beginning
+	tla             = time.time()
 	while condition and (global_counts < max_counts and elapsed <= max_seconds):
 		# Read one chunk of audio data from stream into memory. 
 		data = stream.read(chunk_size, exception_on_overflow=False)
+		buffers_read_interval += 1
 		# Convert hex values into a list of decimal values
 		values = list(wave.struct.unpack("%dh" % (chunk_size * device_channels), data))
 		# Extract every other element (left channel)
@@ -137,12 +140,13 @@ def pulsecatcher(mode, continue_spectrum):
 						global_counts  			+= 1	
 						global_cps 				+= 1
 
-		t1 = datetime.datetime.now() # Time capture
 		te = time.time()
-		elapsed = te - tb + already_elapsed
-
 		# Saves histogram to json file at interval
 		if te - tla >= t_interval:
+			tla = time.time()
+			t1 = datetime.datetime.now() # Time capture
+			elapsed = te - tb + already_elapsed
+			
 			settings 		= fn.load_settings()
 			spectrum_name   = settings[1]
 			max_counts      = settings[9]
@@ -155,16 +159,21 @@ def pulsecatcher(mode, continue_spectrum):
 			
 			if mode == 2:
 				fn.write_histogram_json(t0, t1, bins, global_counts, int(elapsed), spectrum_name, histogram, coeff_1, coeff_2, coeff_3)
-				tla = time.time()
 
 			if mode == 3:
 				fn.write_3D_intervals_json(t0, t1, bins, global_counts, int(elapsed), spectrum_name, histogram_3d, coeff_1, coeff_2, coeff_3)
 				histogram_3d = [0] * bins
-				tla = time.time()
 
 			fn.write_cps_json(spectrum_name, global_cps)
 			global_cps = 0
+			
+			fn.log_info(f'files updated, buffers read: {buffers_read_interval}')
+			buffers_read_total += buffers_read_interval
+			buffers_read_interval = 0
 	
+	buffers_expected = int((elapsed - already_elapsed) * sample_rate / chunk_size)
+	buffers_lost = buffers_expected - buffers_read_total
+	fn.log_info(f'capture stopped, lost buffers: {buffers_lost} ({(buffers_lost/buffers_expected*100):.3}%)')
 	p.terminate() # closes stream when done
 	return						
 											
