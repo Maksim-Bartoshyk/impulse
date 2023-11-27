@@ -1,3 +1,5 @@
+Modification of original tool for my personal usage.
+
 IMPULSE
 -------
 Python Script MCA for gamma spectrometry.
